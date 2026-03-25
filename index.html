@@ -331,6 +331,28 @@
       font-family: 'DM Serif Display', serif;
     }
 
+    /* ── error state ── */
+    .error-msg {
+      display: none;
+      padding: 14px 16px;
+      background: rgba(255, 79, 79, 0.08);
+      border: 1px solid var(--red);
+      border-radius: 4px;
+      font-size: 13px;
+      color: var(--red);
+      max-width: 480px;
+    }
+
+    .error-msg.visible {
+      display: block;
+    }
+
+    /* ── submit loading state ── */
+    button[type="submit"]:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
     /* ── success state ── */
     .success-msg {
       display: none;
@@ -409,16 +431,7 @@
     </section>
 
     <div class="form-wrap">
-      <form
-        action="https://formsubmit.co/interest@placeholdr.net"
-        method="POST"
-        id="earlyAccessForm"
-      >
-        <input type="hidden" name="_subject" value="Placeholdr early access request">
-        <input type="hidden" name="_captcha" value="false">
-        <input type="hidden" name="_next" value="https://placeholdr.net/?thanks=1">
-        <input type="hidden" name="_template" value="table">
-
+      <form id="earlyAccessForm">
         <div class="form-row">
           <input
             type="email"
@@ -433,6 +446,10 @@
 
       <div class="success-msg" id="successMsg">
         You're on the list. We'll be in touch before launch.
+      </div>
+
+      <div class="error-msg" id="errorMsg">
+        Something went wrong. Please try again.
       </div>
 
       <p class="form-note">No commitment. No dark patterns. Cancel anytime — your node gets deprovisioned.</p>
@@ -479,13 +496,51 @@
   </div>
 
   <script>
-    // Handle ?thanks=1 redirect from formsubmit
-    if (window.location.search.includes('thanks=1')) {
-      document.getElementById('earlyAccessForm').style.display = 'none';
-      document.getElementById('successMsg').classList.add('visible');
-      // Clean URL without reload
-      window.history.replaceState({}, '', window.location.pathname);
-    }
+    const form      = document.getElementById('earlyAccessForm');
+    const successMsg = document.getElementById('successMsg');
+    const errorMsg   = document.getElementById('errorMsg');
+    const submitBtn  = form.querySelector('button[type="submit"]');
+
+    form.addEventListener('submit', async function (e) {
+      e.preventDefault();
+
+      const email = form.querySelector('input[type="email"]').value;
+
+      // Reset state
+      successMsg.classList.remove('visible');
+      errorMsg.classList.remove('visible');
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Sending…';
+
+      try {
+        const res = await fetch('https://formsubmit.co/ajax/interest@placeholdr.net', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          },
+          body: JSON.stringify({
+            email,
+            _subject: 'Placeholdr early access request',
+            _captcha: 'false'
+          })
+        });
+
+        const data = await res.json();
+
+        if (res.ok && data.success === 'true') {
+          form.style.display = 'none';
+          successMsg.classList.add('visible');
+        } else {
+          throw new Error(data.message || 'Submission failed');
+        }
+      } catch (err) {
+        errorMsg.textContent = err.message || 'Something went wrong. Please try again.';
+        errorMsg.classList.add('visible');
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Get early access';
+      }
+    });
   </script>
 </body>
 </html>
